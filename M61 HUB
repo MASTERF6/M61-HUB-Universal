@@ -1,25 +1,9 @@
 --[[
-    M61 Hub - Full
-    Line ESP = First Person Compatible
+    M61 Hub - Fixed (UI lengkap + stabil)
 ]]
 
-local useOldRayfield = getgenv().M61_UseOldRayfield == true
-
-local Rayfield
-if useOldRayfield then
-    getgenv().RAYFIELD_SECURE = true
-    Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-else
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet("https://sirius.menu/gen2"))()
-    end)
-    if success and result then
-        Rayfield = result
-    else
-        getgenv().RAYFIELD_SECURE = true
-        Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-    end
-end
+getgenv().RAYFIELD_SECURE = true
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -29,37 +13,20 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local States = {
-    Speed = false,
-    SpeedValue = 50,
-    Fly = false,
-    FlyValue = 50,
-    ESP = false,
-    Noclip = false,
-    Nofog = false,
-    Fullbright = false,
-    Day = false,
-    AntiGameplayPaused = false,
-    AntiIdle = false,
-    InstantProximity = false,
-    LineESP = false
+    Speed = false, SpeedValue = 50,
+    Fly = false, FlyValue = 50,
+    ESP = false, Noclip = false, Nofog = false,
+    Fullbright = false, Day = false,
+    AntiGameplayPaused = false, AntiIdle = false,
+    InstantProximity = false, LineESP = false
 }
 
 local Connections = {}
 local ESPObjects = {}
 local SavedCFrame = nil
 local SelectedPlayer = nil
-local FlyConnection = nil
-local FlyBV = nil
-local FlyBG = nil
-
--- Line ESP
-local LinePosition = nil
-local LineAnchor = nil
-local LineStart = nil
-local LineBeam = nil
-local LineAtt0 = nil
-local LineAtt1 = nil
-local LineBillboard = nil
+local FlyConnection, FlyBV, FlyBG = nil, nil, nil
+local LinePosition, LineAnchor, LineStart, LineBeam, LineAtt0, LineAtt1, LineBillboard
 
 local function cleanup(name)
     if Connections[name] then
@@ -68,14 +35,12 @@ local function cleanup(name)
     end
 end
 
--- ===================== SPEED =====================
+-- SPEED
 local function applySpeed()
     local char = LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.WalkSpeed = States.Speed and States.SpeedValue or 16
-    end
+    if hum then hum.WalkSpeed = States.Speed and States.SpeedValue or 16 end
 end
 
 local function setupSpeed()
@@ -91,12 +56,9 @@ local function setupSpeed()
     end
 end
 
--- ===================== FLY (IY Style) =====================
+-- FLY
 local function stopFly()
-    if FlyConnection then
-        FlyConnection:Disconnect()
-        FlyConnection = nil
-    end
+    if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
     if FlyBV then FlyBV:Destroy() FlyBV = nil end
     if FlyBG then FlyBG:Destroy() FlyBG = nil end
     local char = LocalPlayer.Character
@@ -115,12 +77,10 @@ local function startFly()
     if not hrp or not hum then return end
 
     hum.PlatformStand = true
-
     FlyBV = Instance.new("BodyVelocity")
     FlyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     FlyBV.Velocity = Vector3.zero
     FlyBV.Parent = hrp
-
     FlyBG = Instance.new("BodyGyro")
     FlyBG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     FlyBG.P = 9e4
@@ -128,31 +88,19 @@ local function startFly()
 
     FlyConnection = RunService.RenderStepped:Connect(function()
         if not States.Fly then stopFly() return end
-        if not hrp or not hrp.Parent or not hum or not hum.Parent then stopFly() return end
-
+        if not hrp.Parent or not hum.Parent then stopFly() return end
         local speed = States.FlyValue
         local md = hum.MoveDirection
         local cam = workspace.CurrentCamera
-
         local horizontal = Vector3.new(md.X, 0, md.Z)
-        if horizontal.Magnitude > 0 then
-            horizontal = horizontal.Unit * speed
-        end
-
+        if horizontal.Magnitude > 0 then horizontal = horizontal.Unit * speed end
         local up = 0
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) or hum.Jump then
-            up = speed
-        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then
-            up = -speed
-        end
-
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) or hum.Jump then up = speed
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then up = -speed end
         if UserInputService.TouchEnabled then
             local lookY = cam.CFrame.LookVector.Y
-            if math.abs(lookY) > 0.4 and md.Magnitude > 0.1 then
-                up = speed * lookY
-            end
+            if math.abs(lookY) > 0.4 and md.Magnitude > 0.1 then up = speed * lookY end
         end
-
         FlyBV.Velocity = Vector3.new(horizontal.X, up, horizontal.Z)
         FlyBG.CFrame = cam.CFrame
     end)
@@ -172,80 +120,43 @@ local function setupFly()
     end
 end
 
--- ===================== ESP =====================
+-- ESP
 local function getESPColor(player)
     if player.Team then
-        local teamName = string.lower(player.Team.Name)
-        if string.find(teamName, "seek") or string.find(teamName, "hunter") or string.find(teamName, "murder") then
-            return Color3.fromRGB(255, 50, 50)
-        elseif string.find(teamName, "hide") or string.find(teamName, "innocent") or string.find(teamName, "survivor") then
-            return Color3.fromRGB(50, 150, 255)
-        elseif string.find(teamName, "lobby") or string.find(teamName, "wait") then
-            return Color3.fromRGB(180, 180, 180)
-        end
+        local t = string.lower(player.Team.Name)
+        if t:find("seek") or t:find("hunter") or t:find("murder") then return Color3.fromRGB(255, 50, 50) end
+        if t:find("hide") or t:find("innocent") or t:find("survivor") then return Color3.fromRGB(50, 150, 255) end
+        if t:find("lobby") or t:find("wait") then return Color3.fromRGB(180, 180, 180) end
         if player.TeamColor then return player.TeamColor.Color end
     end
-
-    local role = player:GetAttribute("Role") or player:GetAttribute("role") or player:GetAttribute("Status")
-    if typeof(role) == "string" then
-        local r = string.lower(role)
-        if string.find(r, "seek") or string.find(r, "hunter") or string.find(r, "murder") then
-            return Color3.fromRGB(255, 50, 50)
-        elseif string.find(r, "hide") or string.find(r, "innocent") then
-            return Color3.fromRGB(50, 150, 255)
-        end
-    end
-
-    local ls = player:FindFirstChild("leaderstats")
-    if ls then
-        for _, v in ipairs(ls:GetChildren()) do
-            if v:IsA("StringValue") or v:IsA("IntValue") then
-                local val = string.lower(tostring(v.Value))
-                if string.find(val, "seek") or string.find(val, "hunter") then
-                    return Color3.fromRGB(255, 50, 50)
-                elseif string.find(val, "hide") then
-                    return Color3.fromRGB(50, 150, 255)
-                end
-            end
-        end
-    end
-
     return Color3.fromRGB(0, 255, 128)
 end
 
 local function createESP(player)
-    if player == LocalPlayer then return end
-    if ESPObjects[player] then return end
-
+    if player == LocalPlayer or ESPObjects[player] then return end
     local function setupCharacter(char)
         if not char then return end
         local hrp = char:WaitForChild("HumanoidRootPart", 5)
         if not hrp then return end
-
         if ESPObjects[player] then
             pcall(function()
                 if ESPObjects[player].Highlight then ESPObjects[player].Highlight:Destroy() end
                 if ESPObjects[player].Billboard then ESPObjects[player].Billboard:Destroy() end
             end)
         end
-
         local color = getESPColor(player)
-
         local highlight = Instance.new("Highlight")
         highlight.FillColor = color
         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
         highlight.FillTransparency = 0.55
-        highlight.OutlineTransparency = 0
         highlight.Adornee = char
         highlight.Parent = char
-
         local billboard = Instance.new("BillboardGui")
         billboard.Adornee = hrp
         billboard.Size = UDim2.new(0, 200, 0, 50)
         billboard.StudsOffset = Vector3.new(0, 3.5, 0)
         billboard.AlwaysOnTop = true
         billboard.Parent = char
-
         local nameLabel = Instance.new("TextLabel")
         nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
         nameLabel.BackgroundTransparency = 1
@@ -255,7 +166,6 @@ local function createESP(player)
         nameLabel.Font = Enum.Font.GothamBold
         nameLabel.TextSize = 14
         nameLabel.Parent = billboard
-
         local distLabel = Instance.new("TextLabel")
         distLabel.Size = UDim2.new(1, 0, 0.5, 0)
         distLabel.Position = UDim2.new(0, 0, 0.5, 0)
@@ -266,15 +176,8 @@ local function createESP(player)
         distLabel.Font = Enum.Font.Gotham
         distLabel.TextSize = 12
         distLabel.Parent = billboard
-
-        ESPObjects[player] = {
-            Highlight = highlight,
-            Billboard = billboard,
-            NameLabel = nameLabel,
-            DistLabel = distLabel
-        }
+        ESPObjects[player] = { Highlight = highlight, Billboard = billboard, NameLabel = nameLabel, DistLabel = distLabel }
     end
-
     if player.Character then setupCharacter(player.Character) end
     player.CharacterAdded:Connect(function(char)
         task.wait(0.4)
@@ -294,100 +197,75 @@ end
 
 local function updateESP()
     if not States.ESP then return end
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     for player, data in pairs(ESPObjects) do
-        if player.Parent and data.DistLabel and data.Highlight then
-            local newColor = getESPColor(player)
-            data.Highlight.FillColor = newColor
-            if data.NameLabel then
-                data.NameLabel.TextColor3 = newColor
-                data.NameLabel.Text = player.Name
-            end
+        if player.Parent and data.DistLabel then
+            local c = getESPColor(player)
+            if data.Highlight then data.Highlight.FillColor = c end
+            if data.NameLabel then data.NameLabel.TextColor3 = c data.NameLabel.Text = player.Name end
             if myHRP and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (myHRP.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                data.DistLabel.Text = string.format("%d studs", math.floor(dist))
-            else
-                data.DistLabel.Text = "?"
+                data.DistLabel.Text = math.floor((myHRP.Position - player.Character.HumanoidRootPart.Position).Magnitude) .. " studs"
             end
         end
     end
 end
 
 local function setupESP()
-    cleanup("ESPJoin")
-    cleanup("ESPUpdate")
+    cleanup("ESPJoin") cleanup("ESPUpdate")
     if States.ESP then
         for _, plr in ipairs(Players:GetPlayers()) do createESP(plr) end
         Connections.ESPJoin = Players.PlayerAdded:Connect(createESP)
         Players.PlayerRemoving:Connect(removeESP)
         Connections.ESPUpdate = RunService.RenderStepped:Connect(updateESP)
     else
-        for plr, _ in pairs(ESPObjects) do removeESP(plr) end
+        for plr in pairs(ESPObjects) do removeESP(plr) end
     end
 end
 
--- ===================== LINE ESP (First Person Compatible) =====================
+-- LINE ESP
 local function destroyLineESP()
     cleanup("LineESP")
-    if LineBeam then LineBeam:Destroy() LineBeam = nil end
-    if LineAtt0 then LineAtt0:Destroy() LineAtt0 = nil end
-    if LineAtt1 then LineAtt1:Destroy() LineAtt1 = nil end
-    if LineBillboard then LineBillboard:Destroy() LineBillboard = nil end
-    if LineAnchor then LineAnchor:Destroy() LineAnchor = nil end
-    if LineStart then LineStart:Destroy() LineStart = nil end
+    for _, v in pairs({LineBeam, LineAtt0, LineAtt1, LineBillboard, LineAnchor, LineStart}) do
+        if v then pcall(function() v:Destroy() end) end
+    end
+    LineBeam, LineAtt0, LineAtt1, LineBillboard, LineAnchor, LineStart = nil, nil, nil, nil, nil, nil
 end
 
 local function createLineESP()
     destroyLineESP()
     if not LinePosition then return end
-
     local cam = workspace.CurrentCamera
-
     LineStart = Instance.new("Part")
-    LineStart.Name = "M61LineStart"
     LineStart.Anchored = true
     LineStart.CanCollide = false
-    LineStart.CanQuery = false
     LineStart.Transparency = 1
     LineStart.Size = Vector3.new(0.2, 0.2, 0.2)
     LineStart.CFrame = cam.CFrame * CFrame.new(0, -0.5, -3)
     LineStart.Parent = workspace
-
     LineAnchor = Instance.new("Part")
-    LineAnchor.Name = "M61LineEnd"
     LineAnchor.Anchored = true
     LineAnchor.CanCollide = false
-    LineAnchor.CanQuery = false
     LineAnchor.Transparency = 1
     LineAnchor.Size = Vector3.new(1, 1, 1)
     LineAnchor.Position = LinePosition
     LineAnchor.Parent = workspace
-
     LineBillboard = Instance.new("BillboardGui")
     LineBillboard.Size = UDim2.new(0, 120, 0, 40)
     LineBillboard.AlwaysOnTop = true
     LineBillboard.StudsOffset = Vector3.new(0, 2, 0)
     LineBillboard.Adornee = LineAnchor
     LineBillboard.Parent = LineAnchor
-
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = "📍 Target"
+    label.Text = "Target"
     label.TextColor3 = Color3.fromRGB(0, 255, 255)
     label.TextStrokeTransparency = 0.2
     label.Font = Enum.Font.GothamBold
     label.TextSize = 14
     label.Parent = LineBillboard
-
-    LineAtt0 = Instance.new("Attachment")
-    LineAtt0.Parent = LineStart
-
-    LineAtt1 = Instance.new("Attachment")
-    LineAtt1.Parent = LineAnchor
-
+    LineAtt0 = Instance.new("Attachment", LineStart)
+    LineAtt1 = Instance.new("Attachment", LineAnchor)
     LineBeam = Instance.new("Beam")
     LineBeam.Attachment0 = LineAtt0
     LineBeam.Attachment1 = LineAtt1
@@ -397,99 +275,66 @@ local function createLineESP()
     LineBeam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 255))
     LineBeam.Transparency = NumberSequence.new(0.15)
     LineBeam.LightEmission = 1
-    LineBeam.Segments = 20
     LineBeam.Parent = LineStart
-
     Connections.LineESP = RunService.RenderStepped:Connect(function()
-        if not States.LineESP or not LinePosition then
-            destroyLineESP()
-            return
-        end
-
+        if not States.LineESP or not LinePosition then destroyLineESP() return end
         local camera = workspace.CurrentCamera
-        if LineStart and camera then
-            LineStart.CFrame = camera.CFrame * CFrame.new(0, -0.5, -3)
-        end
-
-        if LineAnchor then
-            LineAnchor.Position = LinePosition
-        end
-
+        if LineStart and camera then LineStart.CFrame = camera.CFrame * CFrame.new(0, -0.5, -3) end
+        if LineAnchor then LineAnchor.Position = LinePosition end
         if label and camera then
-            local dist = (camera.CFrame.Position - LinePosition).Magnitude
-            label.Text = string.format("📍 %d studs", math.floor(dist))
+            label.Text = math.floor((camera.CFrame.Position - LinePosition).Magnitude) .. " studs"
         end
     end)
 end
 
 local function setupLineESP()
-    if States.LineESP and LinePosition then
-        createLineESP()
-    else
-        destroyLineESP()
-    end
+    if States.LineESP and LinePosition then createLineESP() else destroyLineESP() end
 end
 
 local function setLinePosition()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
         LinePosition = char.HumanoidRootPart.Position
-        pcall(function()
-            Rayfield:Notify({Title = "M61 Hub", Content = "Line position set!", Duration = 3})
-        end)
-        if States.LineESP then
-            createLineESP()
-        end
+        Rayfield:Notify({ Title = "M61 Hub", Content = "Line position set!", Duration = 3 })
+        if States.LineESP then createLineESP() end
     end
 end
 
--- ===================== NOCLIP =====================
+-- LAINNYA
 local function setupNoclip()
     cleanup("Noclip")
     if States.Noclip then
         Connections.Noclip = RunService.Stepped:Connect(function()
             local char = LocalPlayer.Character
             if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+                for _, p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
                 end
             end
         end)
     end
 end
 
--- ===================== NOFOG =====================
 local function setupNofog()
-    if States.Nofog then
-        Lighting.FogEnd = 100000
-        Lighting.FogStart = 0
-    else
-        Lighting.FogEnd = 1000
-    end
+    Lighting.FogEnd = States.Nofog and 100000 or 1000
+    if States.Nofog then Lighting.FogStart = 0 end
 end
 
--- ===================== FULLBRIGHT =====================
-local oldBrightness, oldClockTime, oldAmbient
-
+local oldB, oldC, oldA
 local function setupFullbright()
     if States.Fullbright then
-        oldBrightness = Lighting.Brightness
-        oldClockTime = Lighting.ClockTime
-        oldAmbient = Lighting.Ambient
+        oldB, oldC, oldA = Lighting.Brightness, Lighting.ClockTime, Lighting.Ambient
         Lighting.Brightness = 2
         Lighting.ClockTime = 14
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
         Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
     else
-        if oldBrightness then Lighting.Brightness = oldBrightness end
-        if oldClockTime then Lighting.ClockTime = oldClockTime end
-        if oldAmbient then Lighting.Ambient = oldAmbient end
+        if oldB then Lighting.Brightness = oldB end
+        if oldC then Lighting.ClockTime = oldC end
+        if oldA then Lighting.Ambient = oldA end
     end
 end
 
--- ===================== DAY =====================
 local function setupDay()
     cleanup("Day")
     if States.Day then
@@ -500,19 +345,15 @@ local function setupDay()
     end
 end
 
--- ===================== ANTI GAMEPLAY PAUSED =====================
 local function setupAntiGameplayPaused()
     cleanup("AntiGameplayPaused")
     if States.AntiGameplayPaused then
         Connections.AntiGameplayPaused = LocalPlayer:GetPropertyChangedSignal("GameplayPaused"):Connect(function()
-            if LocalPlayer.GameplayPaused then
-                LocalPlayer.GameplayPaused = false
-            end
+            if LocalPlayer.GameplayPaused then LocalPlayer.GameplayPaused = false end
         end)
     end
 end
 
--- ===================== ANTI IDLE =====================
 local function setupAntiIdle()
     cleanup("AntiIdle")
     if States.AntiIdle then
@@ -523,39 +364,29 @@ local function setupAntiIdle()
     end
 end
 
--- ===================== INSTANT PROXIMITY =====================
 local function setupInstantProximity()
     cleanup("InstantProximityAdded")
     if States.InstantProximity then
         for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("ProximityPrompt") then
-                v.HoldDuration = 0
-            end
+            if v:IsA("ProximityPrompt") then v.HoldDuration = 0 end
         end
         Connections.InstantProximityAdded = workspace.DescendantAdded:Connect(function(v)
-            if v:IsA("ProximityPrompt") then
-                task.defer(function() v.HoldDuration = 0 end)
-            end
+            if v:IsA("ProximityPrompt") then task.defer(function() v.HoldDuration = 0 end) end
         end)
     end
 end
 
--- ===================== POSITION =====================
 local function savePosition()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
         SavedCFrame = char.HumanoidRootPart.CFrame
-        pcall(function()
-            Rayfield:Notify({Title = "M61 Hub", Content = "Position saved!", Duration = 3})
-        end)
+        Rayfield:Notify({ Title = "M61 Hub", Content = "Position saved!", Duration = 3 })
     end
 end
 
 local function teleportToSaved()
     if not SavedCFrame then
-        pcall(function()
-            Rayfield:Notify({Title = "M61 Hub", Content = "Belum ada posisi yang disimpan!", Duration = 3})
-        end)
+        Rayfield:Notify({ Title = "M61 Hub", Content = "Belum ada posisi!", Duration = 3 })
         return
     end
     local char = LocalPlayer.Character
@@ -564,13 +395,10 @@ local function teleportToSaved()
     end
 end
 
--- ===================== TELEPORT TO PLAYER =====================
 local function getPlayerList()
     local list = {}
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            table.insert(list, plr.Name)
-        end
+        if plr ~= LocalPlayer then table.insert(list, plr.Name) end
     end
     table.sort(list)
     return list
@@ -587,41 +415,87 @@ local function teleportToPlayer(name)
     end
 end
 
--- ===================== UI =====================
-local Window
-local gen2Success = pcall(function()
-    if not useOldRayfield then
-        Window = Rayfield:CreateWindow({
-            name = "M61 Hub",
-            subtitle = "Universal",
-            sidebarLayout = true
-        })
+-- ===================== UI (LENGKAP) =====================
+local Window = Rayfield:CreateWindow({
+    Name = "M61 Hub",
+    LoadingTitle = "M61 Hub",
+    LoadingSubtitle = "Universal",
+    Theme = "Default",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+local UniversalTab = Window:CreateTab("Universal Game", 4483362458)
+local OptionTab = Window:CreateTab("Option", 4483362458)
+
+UniversalTab:CreateSection("Movement")
+UniversalTab:CreateToggle({ Name = "Speed", CurrentValue = false, Callback = function(v) States.Speed = v setupSpeed() end })
+UniversalTab:CreateInput({ Name = "Speed Value", PlaceholderText = "50", RemoveTextAfterFocusLost = false, Callback = function(t)
+    local n = tonumber(t) if n and n > 0 then States.SpeedValue = n if States.Speed then applySpeed() end end
+end })
+UniversalTab:CreateToggle({ Name = "Fly", CurrentValue = false, Callback = function(v) States.Fly = v setupFly() end })
+UniversalTab:CreateInput({ Name = "Fly Speed", PlaceholderText = "50", RemoveTextAfterFocusLost = false, Callback = function(t)
+    local n = tonumber(t) if n and n > 0 then States.FlyValue = n end
+end })
+
+UniversalTab:CreateSection("Visual")
+UniversalTab:CreateToggle({ Name = "ESP", CurrentValue = false, Callback = function(v) States.ESP = v setupESP() end })
+UniversalTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Callback = function(v) States.Noclip = v setupNoclip() end })
+UniversalTab:CreateToggle({ Name = "Nofog", CurrentValue = false, Callback = function(v) States.Nofog = v setupNofog() end })
+UniversalTab:CreateToggle({ Name = "Fullbright (FB)", CurrentValue = false, Callback = function(v) States.Fullbright = v setupFullbright() end })
+UniversalTab:CreateToggle({ Name = "Day", CurrentValue = false, Callback = function(v) States.Day = v setupDay() end })
+
+UniversalTab:CreateSection("Protection")
+UniversalTab:CreateToggle({ Name = "Anti Gameplay Paused", CurrentValue = false, Callback = function(v) States.AntiGameplayPaused = v setupAntiGameplayPaused() end })
+UniversalTab:CreateToggle({ Name = "Anti Idle / Anti Kick", CurrentValue = false, Callback = function(v) States.AntiIdle = v setupAntiIdle() end })
+
+UniversalTab:CreateSection("Interaction")
+UniversalTab:CreateToggle({ Name = "Instant Proximity", CurrentValue = false, Callback = function(v) States.InstantProximity = v setupInstantProximity() end })
+
+UniversalTab:CreateSection("Position")
+UniversalTab:CreateButton({ Name = "Save Position", Callback = savePosition })
+UniversalTab:CreateButton({ Name = "Teleport to Saved Position", Callback = teleportToSaved })
+
+UniversalTab:CreateSection("Line ESP")
+UniversalTab:CreateButton({ Name = "Set Line Position", Callback = setLinePosition })
+UniversalTab:CreateToggle({ Name = "Line ESP", CurrentValue = false, Callback = function(v)
+    States.LineESP = v
+    if v and not LinePosition then
+        Rayfield:Notify({ Title = "M61 Hub", Content = "Set line position dulu!", Duration = 3 })
+        return
     end
+    setupLineESP()
+end })
+
+UniversalTab:CreateSection("Teleport to Player")
+local PlayerDropdown = UniversalTab:CreateDropdown({
+    Name = "Select Player",
+    Options = getPlayerList(),
+    CurrentOption = {"None"},
+    MultipleOptions = false,
+    Callback = function(o) SelectedPlayer = type(o) == "table" and o[1] or o end
+})
+UniversalTab:CreateButton({ Name = "Refresh Player List", Callback = function()
+    PlayerDropdown:Refresh(getPlayerList())
+end })
+UniversalTab:CreateButton({ Name = "Teleport to Selected Player", Callback = function()
+    if SelectedPlayer and SelectedPlayer ~= "None" then teleportToPlayer(SelectedPlayer) end
+end })
+
+OptionTab:CreateSection("Info")
+OptionTab:CreateParagraph({ Title = "M61 Hub", Content = "Pakai Rayfield stabil. Upload script lengkap ke GitHub agar loadstring tidak kosong." })
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    pcall(function() PlayerDropdown:Refresh(getPlayerList()) end)
+end)
+Players.PlayerRemoving:Connect(function()
+    task.wait(0.5)
+    pcall(function() PlayerDropdown:Refresh(getPlayerList()) end)
+end)
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.8)
+    if States.LineESP and LinePosition then createLineESP() end
 end)
 
-if not gen2Success or not Window then
-    Window = Rayfield:CreateWindow({
-        Name = "M61 Hub",
-        LoadingTitle = "M61 Hub",
-        LoadingSubtitle = useOldRayfield and "Old Rayfield" or "Loading...",
-        Theme = "Default",
-        ConfigurationSaving = { Enabled = false },
-        KeySystem = false
-    })
-end
-
-local UniversalTab
-local tabSuccess = pcall(function()
-    UniversalTab = Window:CreateTab({ name = "Universal Game" })
-end)
-if not tabSuccess or not UniversalTab then
-    UniversalTab = Window:CreateTab("Universal Game", 4483362458)
-end
-
-local OptionTab
-local optSuccess = pcall(function()
-    OptionTab = Window:CreateTab({ name = "Option" })
-end)
-if not optSuccess or not OptionTab then
-    OptionTab = Window:CreateTab("Option", 4483362458)
-end
+Rayfield:Notify({ Title = "M61 Hub", Content = "Loaded!", Duration = 3 })
